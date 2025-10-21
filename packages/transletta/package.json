@@ -1,0 +1,43 @@
+{
+  "name": "transletta",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Elegant i18n build system for humans",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": "./bin/index.mjs",
+  "exports": {
+    "./config": {
+      "import": "./dist/config/config.js",
+      "types": "./dist/config/config.d.ts"
+    },
+    "./plugin": {
+      "import": "./dist/plugins/plugin.js",
+      "types": "./dist/plugins/plugin.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "check-types": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/twlite/transletta.git"
+  },
+  "author": "Twilight <hello@twlite.dev>",
+  "homepage": "https://transletta.twlite.dev",
+  "keywords": [
+    "i18n",
+    "translation",
+    "localization",
+    "globalization",
+    "internationalization"
+  ],
+  "devDependencies": {
+    "@types/node": "catalog:build",
+    "tsup": "catalog:build",
+    "typescript": "catalog:build"
+  },
+  "dependencies": {}
+}

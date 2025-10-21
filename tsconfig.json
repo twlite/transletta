@@ -1,0 +1,3 @@
+{
+  "extends": "@transletta/typescript-config/base.json"
+}

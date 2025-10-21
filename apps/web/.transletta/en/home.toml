@@ -1,0 +1,10 @@
+[references]
+buttons = '@common.buttons'
+
+[hero]
+title = 'Hello World'
+description = 'This is a description of the hero section'
+
+[hero.cta]
+sign-up = '{@buttons.sign-up}'
+login = '{@buttons.login}'

@@ -1,0 +1,1 @@
+export { default } from "@transletta/ui/postcss.config";

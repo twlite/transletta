@@ -1,0 +1,11 @@
+{
+  "extends": "@transletta/typescript-config/base.json",
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "module": "esnext",
+    "noEmit": true,
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
