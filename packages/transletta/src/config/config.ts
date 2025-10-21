@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, type TranslettaConfig } from './common';
+import { DEFAULT_CONFIG, type TranslettaConfig } from './common.js';
 
 export type { TranslettaConfig };
 

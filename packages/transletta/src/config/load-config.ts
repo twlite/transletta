@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_CONFIG, type TranslettaConfig } from './common';
+import { DEFAULT_CONFIG, type TranslettaConfig } from './common.js';
 import { pathToFileURL } from 'node:url';
 
 const CONFIG_FILE_NAMES = new Set([

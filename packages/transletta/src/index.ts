@@ -1,2 +1,2 @@
-export * from './transletta';
-export { version } from './version';
+export * from './transletta.js';
+export { version } from './version.js';

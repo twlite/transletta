@@ -7,9 +7,12 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "i18n": "transletta build",
+    "i18n:check": "transletta check",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "transletta": "transletta"
   },
   "license": "MIT",
   "repository": {
@@ -32,6 +35,7 @@
     "@types/react-dom": "^19.1.7",
     "@transletta/eslint-config": "workspace:^",
     "@transletta/typescript-config": "workspace:*",
+    "transletta": "workspace:*",
     "typescript": "catalog:build"
   }
 }
