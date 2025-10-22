@@ -6,6 +6,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": "./bin/index.mjs",
+  "files": [
+    "dist",
+    "bin"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -35,6 +39,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "bun run build",
     "check-types": "tsc --noEmit"
   },
   "license": "MIT",
