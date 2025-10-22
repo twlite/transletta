@@ -1,6 +1,9 @@
 [references]
 buttons = '@common.buttons'
 
+[toast]
+greeting = 'Hello {name}'
+
 [hero]
 title = 'Hello World'
 description = 'This is a description of the hero section'

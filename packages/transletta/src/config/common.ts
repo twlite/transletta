@@ -1,8 +1,10 @@
+import type { TranslettaPlugin } from '../plugins/plugin.js';
+
 export interface TranslettaConfig {
   /**
    * The Transletta plugins to use.
    */
-  plugins: Array<never>;
+  plugins: Array<TranslettaPlugin>;
   /**
    * The input directory for the translations.
    * @default '.transletta'
@@ -33,6 +35,17 @@ export interface TranslettaConfig {
    * @default true
    */
   warnOnEmptyTranslations: boolean;
+  /**
+   * TypeScript definitions generation configuration.
+   * @default true
+   */
+  dts: boolean | 'i18next' | 'next-intl' | (string & {});
+  /**
+   * Custom output path for TypeScript definitions.
+   * If not specified, will be placed in the output directory.
+   * @default null
+   */
+  dtsOutput?: string;
 }
 
 export const DEFAULT_CONFIG: TranslettaConfig = {
@@ -42,4 +55,6 @@ export const DEFAULT_CONFIG: TranslettaConfig = {
   primaryLocale: 'en',
   projects: null,
   warnOnEmptyTranslations: true,
+  dts: true,
+  dtsOutput: undefined,
 };

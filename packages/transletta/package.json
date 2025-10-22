@@ -7,13 +7,30 @@
   "types": "./dist/index.d.ts",
   "bin": "./bin/index.mjs",
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
     "./config": {
+      "types": "./dist/config/config.d.ts",
       "import": "./dist/config/config.js",
-      "types": "./dist/config/config.d.ts"
+      "require": "./dist/config/config.js"
     },
     "./plugin": {
+      "types": "./dist/plugins/plugin.d.ts",
       "import": "./dist/plugins/plugin.js",
-      "types": "./dist/plugins/plugin.d.ts"
+      "require": "./dist/plugins/plugin.js"
+    },
+    "./next": {
+      "types": "./dist/frameworks/next.d.ts",
+      "import": "./dist/frameworks/next.js",
+      "require": "./dist/frameworks/next.js"
+    },
+    "./vite": {
+      "types": "./dist/frameworks/vite.d.ts",
+      "import": "./dist/frameworks/vite.js",
+      "require": "./dist/frameworks/vite.js"
     }
   },
   "scripts": {

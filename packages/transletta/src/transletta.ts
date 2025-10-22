@@ -3,6 +3,7 @@ import type { TranslettaConfig } from './config/config.js';
 import { type CompiledTranslations, TranslationManager } from './core/managers/translation-manager.js';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { createDtsGenerator } from './core/dts/factory.js';
 
 /**
  * The root class for the Transletta application.
@@ -38,9 +39,37 @@ export class Transletta implements Disposable {
   }
 
   /**
+   * Check if the workspace mode is enabled.
+   * @returns True if the workspace mode is enabled, false otherwise.
+   */
+  public isWorkspaceMode(): boolean {
+    return this.config.projects !== null;
+  }
+
+  /**
+   * Get the workspace projects.
+   * @returns The workspace projects.
+   */
+  public getWorkspaceProjects(): Record<string, string> {
+    return this.config.projects ?? {};
+  }
+
+  /**
+   * Check if the workspace is empty.
+   * @returns True if the workspace is empty, false otherwise.
+   */
+  public isWorkspaceEmpty(): boolean {
+    return Object.keys(this.getWorkspaceProjects()).length === 0;
+  }
+
+  /**
    * Compile the translation resources.
    */
   public async compile(): Promise<CompiledTranslations> {
+    if (this.isWorkspaceMode()) {
+      throw new Error('🚨 Workspace mode is currently not supported');
+    }
+
     await this.translations.scan(true);
 
     // Validate schema consistency across locales
@@ -189,7 +218,7 @@ export class Transletta implements Disposable {
       await writeFile(localeFilePath, JSON.stringify(localeData, null, 2));
     }
 
-    // Emit TypeScript definitions using primary locale
+    // Emit TypeScript definitions using the configured generator
     await this.emitTypeScriptDefinitions(resource);
   }
 
@@ -198,101 +227,41 @@ export class Transletta implements Disposable {
    * @param resource The compiled translations to emit.
    */
   private async emitTypeScriptDefinitions(resource: CompiledTranslations) {
+    const generator = createDtsGenerator(this.config);
+
+    if (!generator) {
+      return; // DTS generation is disabled
+    }
+
     const outputDir = this.getOutputDirectory();
     const primaryLocale = this.config.primaryLocale;
-    const primaryTranslations = resource.get(primaryLocale);
 
-    if (!primaryTranslations) {
-      console.warn(`⚠️  Primary locale '${primaryLocale}' not found, skipping TypeScript definitions`);
-      return;
+    try {
+      const definitions = await generator.generate(resource, primaryLocale, outputDir, this.config, this);
+
+      // Determine output path
+      const outputPath = this.config.dtsOutput
+        ? join(process.cwd(), this.config.dtsOutput)
+        : join(outputDir, this.getDtsFileName());
+
+      await writeFile(outputPath, definitions);
+    } catch (error) {
+      console.warn(`⚠️  Failed to generate TypeScript definitions: ${error instanceof Error ? error.message : error}`);
     }
-
-    // Build the type structure from primary locale
-    const typeStructure: Record<string, any> = {};
-
-    for (const translation of primaryTranslations) {
-      typeStructure[translation.metadata.name] = this.buildTypeFromContent(translation.content);
-    }
-
-    // Generate TypeScript definitions
-    const typeDefinitions = this.generateTypeScriptDefinitions(typeStructure);
-    const definitionsPath = join(outputDir, 'translations.d.ts');
-    await writeFile(definitionsPath, typeDefinitions);
   }
 
   /**
-   * Build TypeScript type structure from content.
-   * @param content The translation content.
-   * @returns TypeScript type structure.
+   * Get the appropriate DTS file name based on the generator type.
    */
-  private buildTypeFromContent(content: any): any {
-    if (typeof content === 'string') {
-      return 'string';
+  private getDtsFileName(): string {
+    switch (this.config.dts) {
+      case 'i18next':
+        return 'i18next.d.ts';
+      case 'next-intl':
+        return 'global.d.ts';
+      default:
+        return 'translations.d.ts';
     }
-
-    if (typeof content === 'object' && content !== null && !Array.isArray(content)) {
-      const result: Record<string, any> = {};
-      for (const [key, value] of Object.entries(content)) {
-        result[key] = this.buildTypeFromContent(value);
-      }
-      return result;
-    }
-
-    return 'any';
-  }
-
-  /**
-   * Generate TypeScript definitions string.
-   * @param typeStructure The type structure.
-   * @returns TypeScript definitions string.
-   */
-  private generateTypeScriptDefinitions(typeStructure: Record<string, any>): string {
-    const primaryLocale = this.config.primaryLocale;
-
-    let definitions = `// Auto-generated TypeScript definitions for translations\n`;
-    definitions += `// Generated from primary locale: ${primaryLocale}\n\n`;
-
-    definitions += `export interface Translations {\n`;
-
-    for (const [category, structure] of Object.entries(typeStructure)) {
-      // Quote category names that contain hyphens or other special characters
-      const quotedCategory =
-        category.includes('-') || category.includes('.') || category.includes(' ') ? `'${category}'` : category;
-      definitions += `  ${quotedCategory}: ${this.typeToString(structure, 2)};\n`;
-    }
-
-    definitions += `}\n\n`;
-    definitions += `declare const translations: Translations;\n`;
-    definitions += `export default translations;\n`;
-
-    return definitions;
-  }
-
-  /**
-   * Convert type structure to TypeScript string.
-   * @param type The type structure.
-   * @param indent The indentation level.
-   * @returns TypeScript type string.
-   */
-  private typeToString(type: any, indent: number = 0): string {
-    const spaces = ' '.repeat(indent);
-
-    if (type === 'string') {
-      return 'string';
-    }
-
-    if (typeof type === 'object' && type !== null) {
-      const lines = ['{'];
-      for (const [key, value] of Object.entries(type)) {
-        // Quote keys that contain hyphens or other special characters
-        const quotedKey = key.includes('-') || key.includes('.') || key.includes(' ') ? `'${key}'` : key;
-        lines.push(`${spaces}  ${quotedKey}: ${this.typeToString(value, indent + 2)};`);
-      }
-      lines.push(`${spaces}}`);
-      return lines.join('\n');
-    }
-
-    return 'any';
   }
 
   /**

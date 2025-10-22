@@ -9,3 +9,6 @@ new-key = "This is a new key added to primary locale"
 [hero.cta]
 sign-up = "{@buttons.sign-up} au site web"
 login = "{@buttons.login} au site web"
+
+[toast]
+greeting = "Hello {name}"
