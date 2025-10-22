@@ -1,8 +1,0 @@
-[hero]
-title = 'Hello World'
-description = ''
-empty-field = ''
-
-[buttons]
-sign-up = 'Sign Up'
-login = 'Login'

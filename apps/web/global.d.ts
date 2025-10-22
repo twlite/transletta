@@ -7,7 +7,7 @@ import messages from "./.transletta/generated/en.json";
 
 declare module 'next-intl' {
   interface AppConfig {
-    Locale: 'en' | 'es' | 'fr';
+    Locale: 'en';
     Messages: typeof messages;
     Formats: typeof formats;
   }

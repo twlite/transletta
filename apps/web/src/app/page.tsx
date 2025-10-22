@@ -10,7 +10,13 @@ export default function Page() {
     <div className="flex items-center justify-center min-h-svh">
       <div className="flex flex-col items-center justify-center gap-4">
         <h1 className="text-2xl font-bold">{t('title')}</h1>
-        <Button size="sm">{t('login')}</Button>
+        <p className="text-sm text-gray-500">{t('description')}</p>
+        <div className="flex items-center gap-2">
+          <Button size="sm">{t('get-started')}</Button>
+          <Button size="sm" variant="outline">
+            {t('github')}
+          </Button>
+        </div>
       </div>
     </div>
   );

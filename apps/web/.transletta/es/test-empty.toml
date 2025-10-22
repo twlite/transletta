@@ -1,8 +1,0 @@
-[hero]
-title = "Hola Mundo"
-description = ""
-empty-field = ""
-
-[buttons]
-sign-up = "Registrarse"
-login = "Iniciar Sesión"
