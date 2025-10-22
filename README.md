@@ -2,6 +2,9 @@
 
 A modern, TypeScript-based internationalization (i18n) build system that simplifies translation management for applications and monorepos.
 
+> [!IMPORTANT]
+> This project is in its early stage. Expect bugs!
+
 ## Overview
 
 Transletta transforms human-readable TOML translation files into optimized JSON output, providing a powerful reference system to eliminate duplication and maintain consistency across your translations.
