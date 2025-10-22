@@ -1,0 +1,8 @@
+[hero]
+title = "Bonjour le monde"
+description = ""
+empty-field = ""
+
+[buttons]
+sign-up = "S'inscrire"
+login = "Se connecter"

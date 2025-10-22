@@ -18,6 +18,21 @@ export interface TranslettaConfig {
    * @default 'en'
    */
   primaryLocale: string;
+  /**
+   * The record of available projects to use (monorepos only).
+   * @example
+   * {
+   *   'web': 'apps/web',
+   *   'api': 'apps/api',
+   * }
+   * @default null
+   */
+  projects: Record<string, string> | null;
+  /**
+   * Whether to show a warning when empty translations are found.
+   * @default true
+   */
+  warnOnEmptyTranslations: boolean;
 }
 
 export const DEFAULT_CONFIG: TranslettaConfig = {
@@ -25,4 +40,6 @@ export const DEFAULT_CONFIG: TranslettaConfig = {
   input: '.transletta',
   output: '.transletta/generated',
   primaryLocale: 'en',
+  projects: null,
+  warnOnEmptyTranslations: true,
 };

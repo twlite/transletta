@@ -1,0 +1,170 @@
+# Transletta i18n Build System
+
+Transletta is a TypeScript-based internationalization (i18n) build system that uses TOML files for translation declarations and generates JSON output for consumption by applications.
+
+## Project Structure
+
+```
+transletta/
+├── packages/
+│   ├── transletta/          # Core transletta package
+│   ├── ui/                  # Shared UI components
+│   ├── eslint-config/       # Shared ESLint configuration
+│   └── typescript-config/   # Shared TypeScript configuration
+├── apps/
+│   └── web/                 # Example web application
+└── turbo/                   # Turborepo configuration
+```
+
+## Core Concepts
+
+### Translation Files
+
+- Located in `.transletta/` directory by default
+- Organized by locale: `.transletta/en/`, `.transletta/fr/`, etc.
+- Use TOML format for human-readable translation declarations
+- Generated JSON files are placed in `.transletta/generated/`
+
+### Reference System
+
+Transletta supports a powerful reference system to avoid duplication and maintain consistency:
+
+#### Local References
+
+```toml
+# common.toml
+[buttons]
+sign-up = 'Sign Up'
+login = 'Login'
+
+# home.toml
+[references]
+buttons = '@common.buttons'
+
+[hero]
+title = 'Hello World'
+description = 'This is a description of the hero section'
+
+[hero.cta]
+sign-up = '{@buttons.sign-up}'
+login = '{@buttons.login}'
+welcome = 'Welcome {@hero.title}'
+desc = 'Description: {@hero.description}'
+```
+
+#### Workspace References (Monorepo)
+
+```toml
+[references]
+shared = '@@projectName.shared'
+
+[content]
+title = '{@shared.title}'
+```
+
+### Embedding Syntax
+
+- `{@alias.key}` - References a key from a declared alias
+- `{@key}` - References a local key from the same file (when not in references)
+- `{name}` - Parameter placeholder (preserved for runtime)
+- Whitespace is ignored: `{ @alias.key }` is valid
+
+**Lookup Order**: References -> Local
+
+### Key Features
+
+1. **Circular Reference Detection** - Prevents infinite loops in reference chains
+2. **Parameter Extraction** - Identifies `{name}` style parameters for validation
+3. **Reference Validation** - Ensures all `{@alias}` references are declared
+4. **Workspace Support** - Monorepo-friendly with project references
+
+## Configuration
+
+### transletta.config.ts
+
+```typescript
+import { defineConfig } from 'transletta/config';
+
+export default defineConfig({
+  input: '.transletta', // Input directory
+  output: '.transletta/generated', // Output directory
+  primaryLocale: 'en', // Primary locale
+  projects: {
+    // Monorepo projects
+    web: 'apps/web',
+    api: 'apps/api',
+  },
+});
+```
+
+## CLI Commands
+
+### Build Translations
+
+```bash
+bun run transletta
+```
+
+### Create New Locale
+
+```bash
+bun run transletta create --locale fr
+```
+
+## Development Guidelines
+
+### File Naming
+
+- Use kebab-case for translation files: `home-page.toml`
+- Use descriptive names that match your application structure
+
+### Reference Best Practices
+
+1. Group related translations in common files
+2. Use meaningful alias names in `[references]` blocks
+3. Avoid deep nesting in key paths
+4. Keep reference chains short to maintain readability
+
+### Error Handling
+
+- All reference errors include clear descriptions
+- Circular references show the complete cycle path
+- Missing keys specify the exact path and context
+
+## Architecture
+
+### Core Classes
+
+- `Translation` - Represents a single translation file
+- `TranslationManager` - Manages all translations for a locale
+- `Transletta` - Main orchestrator class
+
+### Key Methods
+
+- `serialize()` - Converts TOML to JSON with reference resolution
+- `getNeighbor()` - Finds neighboring translation files
+- `get()` - Retrieves values with dot notation support
+
+## TypeScript Integration
+
+The system is built with TypeScript and provides:
+
+- Strong typing for configuration
+- Type-safe translation interfaces
+- Comprehensive error types
+- Full IntelliSense support
+
+## Build Process
+
+1. **Scan** - Discover all `.toml` files in locale directories
+2. **Parse** - Parse TOML content and extract references
+3. **Resolve** - Resolve all `{@alias.key}` references
+4. **Validate** - Check for circular references and missing keys
+5. **Generate** - Output clean JSON files for application consumption
+
+## Error Types
+
+- `TranslettaSerializationError` - For reference resolution failures
+- Circular reference detection with cycle path reporting
+- Missing key validation with context information
+- Invalid reference format validation

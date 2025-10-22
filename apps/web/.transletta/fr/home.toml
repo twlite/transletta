@@ -1,0 +1,11 @@
+[references]
+buttons = "@common.buttons"
+
+[hero]
+title = "Bonjour le monde"
+description = "Ceci est une description de la section héros"
+new-key = "This is a new key added to primary locale"
+
+[hero.cta]
+sign-up = "{@buttons.sign-up} au site web"
+login = "{@buttons.login} au site web"

@@ -7,7 +7,7 @@ const CONFIG_FILE_NAMES = new Set([
   'transletta.config.js',
   'transletta.config.mjs',
   'transletta.config.cjs',
-  'transletta.config.ts', // let node handle ts modules if it is supported
+  'transletta.config.ts',
 ]);
 
 /**

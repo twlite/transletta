@@ -4,7 +4,8 @@ buttons = '@common.buttons'
 [hero]
 title = 'Hello World'
 description = 'This is a description of the hero section'
+new-key = 'This is a new key added to primary locale'
 
 [hero.cta]
-sign-up = '{@buttons.sign-up}'
-login = '{@buttons.login}'
+sign-up = '{@buttons.sign-up} to the website'
+login = '{@buttons.login} to the website'

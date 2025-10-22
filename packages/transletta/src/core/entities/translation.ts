@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import * as toml from 'smol-toml';
 import type { TranslationManager } from '../managers/translation-manager.js';
-import { DYNAMIC_CONTENT_REGEX, REFERENCES_KEY } from '../common/constants.js';
+import { EMBEDDING_REGEX, PARAMETER_REGEX, REFERENCES_KEY } from '../common/constants.js';
 import { TranslettaSerializationError } from '../common/errors/transletta-serialization-error.js';
 
 /**
@@ -47,6 +47,7 @@ export interface TranslationMetadata {
 export interface SerializedTranslation {
   metadata: TranslationMetadata;
   content: Record<string, any>;
+  parameters: string[];
 }
 
 /**
@@ -164,64 +165,182 @@ export class Translation {
   }
 
   /**
+   * Get a workspace translation by project name and translation name.
+   * @param projectName The name of the project.
+   * @param translationName The name of the translation.
+   * @returns The workspace translation or null if not found.
+   */
+  public getWorkspaceTranslation(projectName: string, translationName: string): Translation | null {
+    const projects = this.manager.transletta.config.projects;
+    if (!projects || !projects[projectName]) {
+      return null;
+    }
+
+    // For now, we'll need to implement workspace scanning
+    // This is a placeholder for the workspace reference functionality
+    return null;
+  }
+
+  /**
    * Serialize this translation to raw JSON content.
    */
   public serialize(): SerializedTranslation {
-    // TODO: traverse the data and connect references to other translations and generate a plain JSON object
+    return this.serializeWithContext(new Set());
+  }
+
+  /**
+   * Serialize this translation with circular reference detection.
+   * @param visited Set of visited translation paths to detect circular references.
+   */
+  private serializeWithContext(visited: Set<string>): SerializedTranslation {
     const content: Record<string, any> = {};
-    const references: Record<string, Translation> = {};
+    const parameters: string[] = [];
     const { references: referencesMap, ...data } = this.data;
 
-    for (const [key, value] of Object.entries(referencesMap ?? {})) {
-      const neighbor = this.getNeighbor(value);
-      if (!neighbor) {
+    // Check for circular reference
+    const currentPath = `${this.locale}/${this.name}`;
+    if (visited.has(currentPath)) {
+      const cycle = Array.from(visited).concat([currentPath]);
+      throw new TranslettaSerializationError(
+        this,
+        `Circular reference detected: ${cycle.join(' → ')}`,
+        `Circular reference detected in translation chain: ${cycle.join(' → ')}`,
+      );
+    }
+
+    // Add current translation to visited set
+    const newVisited = new Set(visited);
+    newVisited.add(currentPath);
+
+    // Validate and resolve references
+    const resolvedReferences: Record<string, { translation: Translation; keyPath: string }> = {};
+    for (const [alias, reference] of Object.entries(referencesMap ?? {})) {
+      let translation: Translation | null = null;
+      let keyPath = '';
+
+      if (reference.startsWith('@@')) {
+        // Workspace reference: @@projectName or @@projectName.keyPath
+        const rest = reference.slice(2);
+        const dotIndex = rest.indexOf('.');
+        const projectName = dotIndex > -1 ? rest.slice(0, dotIndex) : rest;
+        keyPath = dotIndex > -1 ? rest.slice(dotIndex + 1) : '';
+        translation = this.getWorkspaceTranslation(projectName, alias);
+      } else if (reference.startsWith('@')) {
+        // Local reference: @translationName or @translationName.keyPath
+        const rest = reference.slice(1);
+        const dotIndex = rest.indexOf('.');
+        const translationName = dotIndex > -1 ? rest.slice(0, dotIndex) : rest;
+        keyPath = dotIndex > -1 ? rest.slice(dotIndex + 1) : '';
+        translation = this.getNeighbor(translationName);
+      } else {
         throw new TranslettaSerializationError(
           this,
-          `Reference ${value} not found`,
-          `The reference ${value} of ${this.name} is not found`,
+          `Invalid reference format: ${reference}`,
+          `Reference ${reference} must start with @ or @@`,
         );
       }
 
-      references[key] = neighbor;
+      if (!translation) {
+        throw new TranslettaSerializationError(
+          this,
+          `Reference ${reference} not found`,
+          `The reference ${reference} of ${this.name} is not found`,
+        );
+      }
+
+      resolvedReferences[alias] = { translation, keyPath };
     }
 
+    // Process the data and resolve embeddings
     this.traverse(data, (key, value) => {
       if (typeof value !== 'string') return;
 
-      const matches = value.match(DYNAMIC_CONTENT_REGEX);
-      if (!matches) return;
-
-      for (const match of matches) {
-        const [, key] = match.match(/^@?([a-zA-Z0-9._-]+)/)!;
-        const neighbor = this.getNeighbor(key!);
-        if (!neighbor) {
-          throw new TranslettaSerializationError(
-            this,
-            `Reference ${key} not found`,
-            `The reference ${key} of ${this.name} is not found`,
-          );
+      // Extract parameters (e.g., {name})
+      const parameterMatches = value.match(PARAMETER_REGEX);
+      if (parameterMatches) {
+        for (const match of parameterMatches) {
+          const paramName = match.slice(1, -1).trim();
+          if (!parameters.includes(paramName)) {
+            parameters.push(paramName);
+          }
         }
-
-        value = value.replace(match, neighbor.get(key!));
       }
 
-      content[key] = value.replace(DYNAMIC_CONTENT_REGEX, (match: string) => {
-        const matches = match.match(/^@?([a-zA-Z0-9._-]+)/)!;
-        const neighbor = this.getNeighbor(key!);
-        if (!neighbor) {
-          throw new TranslettaSerializationError(
-            this,
-            `Reference ${key} not found`,
-            `The reference ${key} of ${this.name} is not found`,
-          );
+      // Resolve embeddings (e.g., {@alias.key} or {@key})
+      const embeddingMatches = value.match(EMBEDDING_REGEX);
+      if (embeddingMatches) {
+        for (const match of embeddingMatches) {
+          // Reset regex and use exec to get captured groups
+          EMBEDDING_REGEX.lastIndex = 0;
+          const execResult = EMBEDDING_REGEX.exec(match);
+          if (!execResult || !execResult[1]) continue;
+
+          const fullPath = execResult[1]; // e.g., "buttons.sign-up" or "title"
+          const dotIndex = fullPath.indexOf('.');
+          const alias = dotIndex > -1 ? fullPath.slice(0, dotIndex) : fullPath;
+          const keyPath = dotIndex > -1 ? fullPath.slice(dotIndex + 1) : '';
+
+          let resolvedValue: any;
+
+          // Lookup order: references -> local
+          if (resolvedReferences[alias]) {
+            // Reference exists in [references] block
+            const { translation, keyPath: referenceKeyPath } = resolvedReferences[alias];
+            const fullKeyPath = referenceKeyPath ? `${referenceKeyPath}.${keyPath}` : keyPath;
+
+            // Check if the referenced translation has embeddings that might cause circular references
+            resolvedValue = translation.get(fullKeyPath);
+
+            // If the resolved value is a string with embeddings, resolve them with circular reference detection
+            if (typeof resolvedValue === 'string' && resolvedValue.includes('{@')) {
+              // Create a temporary translation to resolve embeddings in the referenced value
+              const tempTranslation = new Translation(this.manager, {
+                content: `temp = '${resolvedValue}'`,
+                locale: translation.locale,
+                name: `${translation.name}.temp`,
+                path: translation.path,
+              });
+              const tempSerialized = tempTranslation.serializeWithContext(newVisited);
+              resolvedValue = tempSerialized.content.temp;
+            }
+
+            if (resolvedValue === undefined) {
+              throw new TranslettaSerializationError(
+                this,
+                `Key ${fullKeyPath} not found in ${alias}`,
+                `The key ${fullKeyPath} is not found in the referenced translation ${alias}`,
+              );
+            }
+          } else {
+            // Try local lookup - check if the key exists in the current translation
+            const localKey = fullPath; // Use the full path for local lookup
+            resolvedValue = this.get(localKey);
+
+            if (resolvedValue === undefined) {
+              throw new TranslettaSerializationError(
+                this,
+                `Key ${localKey} not found locally or in references`,
+                `The key ${localKey} is not found in the current translation or declared in the [references] block`,
+              );
+            }
+          }
+
+          value = value.replace(match, resolvedValue);
         }
-        return neighbor.get(key!);
-      });
+      }
+
+      content[key] = value;
+
+      // Warn about empty translation strings if enabled in config
+      if (typeof value === 'string' && value.trim() === '' && this.manager.transletta.config.warnOnEmptyTranslations) {
+        console.warn(`⚠️  Empty translation found: ${this.locale}/${this.name} → ${key}`);
+      }
     });
 
     return {
       metadata: this.getMetadata(),
       content,
+      parameters,
     };
   }
 
