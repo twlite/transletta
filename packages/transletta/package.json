@@ -56,5 +56,8 @@
     "tsup": "catalog:build",
     "typescript": "catalog:build"
   },
-  "dependencies": {}
+  "dependencies": {
+    "commander": "^14.0.1",
+    "smol-toml": "^1.4.2"
+  }
 }
