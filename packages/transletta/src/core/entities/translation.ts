@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import * as toml from 'smol-toml';
 import type { TranslationManager } from '../managers/translation-manager.js';
-import { EMBEDDING_REGEX, PARAMETER_REGEX, REFERENCES_KEY } from '../common/constants.js';
+import { EMBEDDING_REGEX, PARAMETER_REGEX } from '../common/constants.js';
 import { TranslettaSerializationError } from '../common/errors/transletta-serialization-error.js';
 
 /**
@@ -101,8 +101,8 @@ export class Translation {
         if (val === undefined) {
           throw new TranslettaSerializationError(
             this,
-            `Path ${path} not found`,
-            `The path ${path} of ${this.name} is not found`,
+            `Key '${path}' not found in section '${parsedName}'`,
+            `The key '${path}' is not found in the '${parsedName}' section of ${this.name}`,
           );
         }
 
@@ -243,8 +243,8 @@ export class Translation {
       if (!translation) {
         throw new TranslettaSerializationError(
           this,
-          `Reference ${reference} not found`,
-          `The reference ${reference} of ${this.name} is not found`,
+          `Reference '${reference}' not found`,
+          `The reference '${reference}' declared in [references] block of ${this.name} points to a non-existent translation file or section`,
         );
       }
 
