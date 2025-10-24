@@ -4,6 +4,7 @@ import { type CompiledTranslations, TranslationManager } from './core/managers/t
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createDtsGenerator } from './core/dts/factory.js';
+import { createClientGenerator } from './core/client/index.js';
 
 /**
  * The root class for the Transletta application.
@@ -218,8 +219,24 @@ export class Transletta implements Disposable {
       await writeFile(localeFilePath, JSON.stringify(localeData, null, 2));
     }
 
+    // Emit client module
+    await this.emitClientModule(resource);
+
     // Emit TypeScript definitions using the configured generator
     await this.emitTypeScriptDefinitions(resource);
+  }
+
+  /**
+   * Emit the client module.
+   * @param resource The compiled translations to emit.
+   */
+  private async emitClientModule(resource: CompiledTranslations) {
+    try {
+      const clientGenerator = createClientGenerator();
+      await clientGenerator.generate(resource, this);
+    } catch (e) {
+      console.warn(`⚠️  Failed to generate client module: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   /**

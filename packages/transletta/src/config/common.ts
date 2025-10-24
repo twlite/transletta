@@ -46,6 +46,11 @@ export interface TranslettaConfig {
    * @default null
    */
   dtsOutput?: string;
+  /**
+   * Whether the emitted json should be single file (compact mode) or not.
+   * @default true
+   */
+  compactOutput: boolean;
 }
 
 export const DEFAULT_CONFIG: TranslettaConfig = {
@@ -57,4 +62,5 @@ export const DEFAULT_CONFIG: TranslettaConfig = {
   warnOnEmptyTranslations: true,
   dts: true,
   dtsOutput: undefined,
+  compactOutput: true,
 };

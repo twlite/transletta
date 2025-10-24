@@ -31,11 +31,12 @@ export class NextIntlDtsGenerator implements DtsGenerator {
 
     const availableLocales = transletta.translations.cache.toKeyArray();
 
-    let definitions = `// Auto-generated next-intl TypeScript definitions\n`;
+    let definitions = `/* eslint-disable */\n`;
+    definitions += `// Auto-generated next-intl TypeScript definitions\n`;
     definitions += `// Generated from primary locale: ${primaryLocale}\n\n`;
 
-    definitions += `import {routing} from '@/i18n/routing';\n`;
-    definitions += `import {formats} from '@/i18n/request';\n`;
+    definitions += `import { routing } from '@/i18n/routing';\n`;
+    definitions += `import { formats } from '@/i18n/request';\n`;
     definitions += `import messages from "${localeFile}";\n\n`;
 
     definitions += `declare module 'next-intl' {\n`;

@@ -22,8 +22,10 @@ export class DefaultDtsGenerator implements DtsGenerator {
       typeStructure[translation.metadata.name] = this.buildTypeFromContent(translation.content);
     }
 
+    const locales = resource.toKeyArray();
+
     // Generate TypeScript definitions
-    return this.generateTypeScriptDefinitions(typeStructure, primaryLocale);
+    return this.generateTypeScriptDefinitions(typeStructure, primaryLocale, locales);
   }
 
   private buildTypeFromContent(content: any): any {
@@ -42,9 +44,15 @@ export class DefaultDtsGenerator implements DtsGenerator {
     return 'any';
   }
 
-  private generateTypeScriptDefinitions(typeStructure: Record<string, any>, primaryLocale: string): string {
-    let definitions = `// Auto-generated TypeScript definitions for translations\n`;
+  private generateTypeScriptDefinitions(
+    typeStructure: Record<string, any>,
+    primaryLocale: string,
+    locales: string[],
+  ): string {
+    let definitions = `/* eslint-disable */\n`;
+    definitions += `// Auto-generated TypeScript definitions for translations\n`;
     definitions += `// Generated from primary locale: ${primaryLocale}\n\n`;
+    definitions += `export type Locales = ${locales.map((locale) => `'${locale}'`).join(' | ')};\n\n`;
 
     definitions += `export interface Translations {\n`;
 

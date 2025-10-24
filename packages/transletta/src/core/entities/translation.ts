@@ -251,91 +251,108 @@ export class Translation {
       resolvedReferences[alias] = { translation, keyPath };
     }
 
-    // Process the data and resolve embeddings
-    this.traverse(data, (key, value) => {
-      if (typeof value !== 'string') return;
+    // Process the data and resolve embeddings while preserving nested structure
+    const processValue = (value: any): any => {
+      if (typeof value === 'string') {
+        let processedValue = value;
 
-      // Extract parameters (e.g., {name})
-      const parameterMatches = value.match(PARAMETER_REGEX);
-      if (parameterMatches) {
-        for (const match of parameterMatches) {
-          const paramName = match.slice(1, -1).trim();
-          if (!parameters.includes(paramName)) {
-            parameters.push(paramName);
-          }
-        }
-      }
-
-      // Resolve embeddings (e.g., {@alias.key} or {@key})
-      const embeddingMatches = value.match(EMBEDDING_REGEX);
-      if (embeddingMatches) {
-        for (const match of embeddingMatches) {
-          // Reset regex and use exec to get captured groups
-          EMBEDDING_REGEX.lastIndex = 0;
-          const execResult = EMBEDDING_REGEX.exec(match);
-          if (!execResult || !execResult[1]) continue;
-
-          const fullPath = execResult[1]; // e.g., "buttons.sign-up" or "title"
-          const dotIndex = fullPath.indexOf('.');
-          const alias = dotIndex > -1 ? fullPath.slice(0, dotIndex) : fullPath;
-          const keyPath = dotIndex > -1 ? fullPath.slice(dotIndex + 1) : '';
-
-          let resolvedValue: any;
-
-          // Lookup order: references -> local
-          if (resolvedReferences[alias]) {
-            // Reference exists in [references] block
-            const { translation, keyPath: referenceKeyPath } = resolvedReferences[alias];
-            const fullKeyPath = referenceKeyPath ? `${referenceKeyPath}.${keyPath}` : keyPath;
-
-            // Check if the referenced translation has embeddings that might cause circular references
-            resolvedValue = translation.get(fullKeyPath);
-
-            // If the resolved value is a string with embeddings, resolve them with circular reference detection
-            if (typeof resolvedValue === 'string' && resolvedValue.includes('{@')) {
-              // Create a temporary translation to resolve embeddings in the referenced value
-              const tempTranslation = new Translation(this.manager, {
-                content: `temp = '${resolvedValue}'`,
-                locale: translation.locale,
-                name: `${translation.name}.temp`,
-                path: translation.path,
-              });
-              const tempSerialized = tempTranslation.serializeWithContext(newVisited);
-              resolvedValue = tempSerialized.content.temp;
-            }
-
-            if (resolvedValue === undefined) {
-              throw new TranslettaSerializationError(
-                this,
-                `Key ${fullKeyPath} not found in ${alias}`,
-                `The key ${fullKeyPath} is not found in the referenced translation ${alias}`,
-              );
-            }
-          } else {
-            // Try local lookup - check if the key exists in the current translation
-            const localKey = fullPath; // Use the full path for local lookup
-            resolvedValue = this.get(localKey);
-
-            if (resolvedValue === undefined) {
-              throw new TranslettaSerializationError(
-                this,
-                `Key ${localKey} not found locally or in references`,
-                `The key ${localKey} is not found in the current translation or declared in the [references] block`,
-              );
+        // Extract parameters (e.g., {name})
+        const parameterMatches = processedValue.match(PARAMETER_REGEX);
+        if (parameterMatches) {
+          for (const match of parameterMatches) {
+            const paramName = match.slice(1, -1).trim();
+            if (!parameters.includes(paramName)) {
+              parameters.push(paramName);
             }
           }
-
-          value = value.replace(match, resolvedValue);
         }
-      }
 
-      content[key] = value;
+        // Resolve embeddings (e.g., {@alias.key} or {@key})
+        const embeddingMatches = processedValue.match(EMBEDDING_REGEX);
+        if (embeddingMatches) {
+          for (const match of embeddingMatches) {
+            // Reset regex and use exec to get captured groups
+            EMBEDDING_REGEX.lastIndex = 0;
+            const execResult = EMBEDDING_REGEX.exec(match);
+            if (!execResult || !execResult[1]) continue;
 
-      // Warn about empty translation strings if enabled in config
-      if (typeof value === 'string' && value.trim() === '' && this.manager.transletta.config.warnOnEmptyTranslations) {
-        console.warn(`⚠️  Empty translation found: ${this.locale}/${this.name} → ${key}`);
+            const fullPath = execResult[1]; // e.g., "buttons.sign-up" or "title"
+            const dotIndex = fullPath.indexOf('.');
+            const alias = dotIndex > -1 ? fullPath.slice(0, dotIndex) : fullPath;
+            const keyPath = dotIndex > -1 ? fullPath.slice(dotIndex + 1) : '';
+
+            let resolvedValue: any;
+
+            // Lookup order: references -> local
+            if (resolvedReferences[alias]) {
+              // Reference exists in [references] block
+              const { translation, keyPath: referenceKeyPath } = resolvedReferences[alias];
+              const fullKeyPath = referenceKeyPath ? `${referenceKeyPath}.${keyPath}` : keyPath;
+
+              // Check if the referenced translation has embeddings that might cause circular references
+              resolvedValue = translation.get(fullKeyPath);
+
+              // If the resolved value is a string with embeddings, resolve them with circular reference detection
+              if (typeof resolvedValue === 'string' && resolvedValue.includes('{@')) {
+                // Create a temporary translation to resolve embeddings in the referenced value
+                const tempTranslation = new Translation(this.manager, {
+                  content: `temp = '${resolvedValue}'`,
+                  locale: translation.locale,
+                  name: `${translation.name}.temp`,
+                  path: translation.path,
+                });
+                const tempSerialized = tempTranslation.serializeWithContext(newVisited);
+                resolvedValue = tempSerialized.content.temp;
+              }
+
+              if (resolvedValue === undefined) {
+                throw new TranslettaSerializationError(
+                  this,
+                  `Key ${fullKeyPath} not found in ${alias}`,
+                  `The key ${fullKeyPath} is not found in the referenced translation ${alias}`,
+                );
+              }
+            } else {
+              // Try local lookup - check if the key exists in the current translation
+              const localKey = fullPath; // Use the full path for local lookup
+              resolvedValue = this.get(localKey);
+
+              if (resolvedValue === undefined) {
+                throw new TranslettaSerializationError(
+                  this,
+                  `Key ${localKey} not found locally or in references`,
+                  `The key ${localKey} is not found in the current translation or declared in the [references] block`,
+                );
+              }
+            }
+
+            processedValue = processedValue.replace(match, resolvedValue);
+          }
+        }
+
+        // Warn about empty translation strings if enabled in config
+        if (processedValue.trim() === '' && this.manager.transletta.config.warnOnEmptyTranslations) {
+          console.warn(`⚠️  Empty translation found: ${this.locale}/${this.name}`);
+        }
+
+        return processedValue;
+      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        // Recursively process nested objects
+        const processedObject: Record<string, any> = {};
+        for (const [nestedKey, nestedValue] of Object.entries(value)) {
+          processedObject[nestedKey] = processValue(nestedValue);
+        }
+        return processedObject;
+      } else {
+        // Return primitive values as-is
+        return value;
       }
-    });
+    };
+
+    // Process all data while preserving structure
+    for (const [key, value] of Object.entries(data)) {
+      content[key] = processValue(value);
+    }
 
     return {
       metadata: this.getMetadata(),
@@ -343,33 +360,4 @@ export class Translation {
       parameters,
     };
   }
-
-  private traverse(data: Record<string, any>, callback: (key: string, value: any) => void) {
-    if (data === null || data === undefined) return;
-
-    for (const [key, value] of Object.entries(data)) {
-      callback(key, value);
-      if (typeof value === 'object' && value !== null) {
-        this.traverse(value, callback);
-      }
-    }
-  }
 }
-
-/*
-{
-  name: 'en/common',
-  data: { buttons: { 'sign-up': 'Sign Up', login: 'Login' } }
-}
-{
-  name: 'en/home',
-  data: {
-    references: { buttons: '@common.buttons' },
-    hero: {
-      title: 'Hello World',
-      description: 'This is a description of the hero section',
-      cta: { 'sign-up': '{@buttons.sign-up}', login: '{@buttons.login}' }
-    }
-  }
-}
-*/

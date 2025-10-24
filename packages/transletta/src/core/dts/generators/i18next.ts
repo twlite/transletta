@@ -27,7 +27,8 @@ export class I18nextDtsGenerator implements DtsGenerator {
     // Calculate relative path from DTS file to JSON file
     const localeFile = generateRelativePath(jsonFilePath, dtsOutputPath);
 
-    let definitions = `// Auto-generated i18next TypeScript definitions\n`;
+    let definitions = `/* eslint-disable */\n`;
+    definitions += `// Auto-generated i18next TypeScript definitions\n`;
     definitions += `// Generated from primary locale: ${primaryLocale}\n\n`;
 
     definitions += `// import the original type declarations\n`;

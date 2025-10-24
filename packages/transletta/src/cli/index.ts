@@ -17,10 +17,11 @@ export async function bootstrapCLI(argv?: string[]): Promise<void> {
     .command('build')
     .description('Compile the translations')
     .alias('b')
-    .action(async () => {
+    .option('-w, --watch', 'Watch for file changes and rebuild automatically')
+    .action(async (options) => {
       try {
         const { buildCommand } = await import('./commands/build.js');
-        await buildCommand(transletta);
+        await buildCommand(transletta, !!options.watch);
       } catch (error) {
         process.exitCode = 1;
         console.error(error instanceof Error ? error.message : `${error}`);
@@ -94,10 +95,10 @@ export async function bootstrapCLI(argv?: string[]): Promise<void> {
     });
 
   // Default action (build)
-  program.action(async () => {
+  program.action(async (options) => {
     try {
       const { buildCommand } = await import('./commands/build.js');
-      await buildCommand(transletta);
+      await buildCommand(transletta, !!options.watch);
     } catch (error) {
       process.exitCode = 1;
       console.error(error instanceof Error ? error.message : `${error}`);

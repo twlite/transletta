@@ -25,6 +25,30 @@ export interface TranslettaNextConfig {
   watchInDevelopment?: boolean;
 }
 
+let phases: string[] = [],
+  devPhase: string = 'phase-development-server';
+
+async function getPhases() {
+  if (phases.length > 0) return phases;
+
+  const {
+    PHASE_DEVELOPMENT_SERVER,
+    PHASE_PRODUCTION_BUILD,
+    // @ts-ignore
+  } = await import('next/constants').catch(() => {
+    // in case import fails for some reason, use fallback values
+    // taken from https://github.com/vercel/next.js/blob/5e6b008b561caf2710ab7be63320a3d549474a5b/packages/next/shared/lib/constants.ts#L19-L22
+    return {
+      PHASE_DEVELOPMENT_SERVER: 'phase-development-server',
+      PHASE_PRODUCTION_BUILD: 'phase-production-build',
+    };
+  });
+
+  devPhase = PHASE_DEVELOPMENT_SERVER;
+
+  return (phases = [PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD]);
+}
+
 /**
  * Creates a Next.js plugin that integrates Transletta with the build process.
  *
@@ -52,56 +76,26 @@ export function createTransletta(options: TranslettaNextConfig = {}) {
 
   let isInitialized = false;
 
-  // Initialize immediately for both webpack and Turbopack
-  const initializeTransletta = () => {
+  const initializeTransletta = (isDev: boolean) => {
     if (isInitialized) return;
     isInitialized = true;
 
-    if (watchInDevelopment) {
-      console.log('🔨 Initializing Transletta for development...');
+    if (isDev && watchInDevelopment) {
       setupDevelopmentWatcher(userConfig);
-    } else if (compileOnBuild) {
-      console.log('🔨 Compiling Transletta for production...');
+    } else if (!isDev && compileOnBuild) {
       compileTranslationsInternal(userConfig);
     }
   };
 
-  // Initialize immediately (works for both webpack and Turbopack)
-  initializeTransletta();
-
   return function withTransletta(nextConfig: NextConfig = {}): NextConfig {
-    return {
-      ...nextConfig,
+    return async (phase: any) => {
+      const phases = await getPhases();
 
-      webpack(config: any, { dev, isServer }: { dev: boolean; isServer: boolean }) {
-        // Run the original webpack config first
-        if (nextConfig.webpack) {
-          config = nextConfig.webpack(config, { dev, isServer });
-        }
+      if (phases.includes(phase)) {
+        initializeTransletta(phase === devPhase);
+      }
 
-        // Transletta is already initialized, just return the config
-        return config;
-      },
-
-      // Turbopack-specific initialization
-      experimental: {
-        ...nextConfig.experimental,
-        turbo: {
-          ...nextConfig.experimental?.turbo,
-          rules: {
-            ...nextConfig.experimental?.turbo?.rules,
-            // Add any Turbopack-specific rules if needed
-          },
-        },
-      },
-
-      // Alternative initialization for Turbopack
-      async rewrites() {
-        const rewrites = nextConfig.rewrites ? await nextConfig.rewrites() : [];
-
-        // Transletta is already initialized, just return rewrites
-        return rewrites;
-      },
+      return typeof nextConfig === 'function' ? nextConfig(...arguments) : nextConfig;
     };
   };
 }
@@ -117,19 +111,13 @@ async function setupDevelopmentWatcher(userConfig?: TranslettaConfig) {
       return;
     }
 
-    console.log('📁 Loading Transletta configuration...');
     const transletta = new Transletta(config);
-
-    // Initial compilation
-    console.log('🔨 Compiling translations...');
     await transletta.compile().then(transletta.emit.bind(transletta));
-    console.log('✅ Initial translation compilation completed');
 
-    // Set up file watching for development with debouncing
     const { watch } = await import('node:fs');
     const translationDir = transletta.getInputDirectory();
 
-    console.log(`👀 Watching translation files in: ${translationDir}`);
+    console.log(`👀 [Transletta] (${process.pid}) Watching translation files in: ${translationDir}`);
 
     let compileTimeout: NodeJS.Timeout | null = null;
     const pendingFiles = new Set<string>();
@@ -146,13 +134,10 @@ async function setupDevelopmentWatcher(userConfig?: TranslettaConfig) {
         // Debounce compilation by 300ms
         compileTimeout = setTimeout(async () => {
           if (pendingFiles.size > 0) {
-            const files = Array.from(pendingFiles);
-            console.log(`🔄 Translation files changed: ${files.join(', ')}`);
             pendingFiles.clear();
 
             try {
               await transletta.compile().then(transletta.emit.bind(transletta));
-              console.log('✅ Translations recompiled successfully');
             } catch (error) {
               console.error('❌ Failed to recompile translations:', error);
             }
@@ -160,8 +145,6 @@ async function setupDevelopmentWatcher(userConfig?: TranslettaConfig) {
         }, 300);
       }
     });
-
-    console.log('👀 Watching translation files for changes...');
   } catch (error) {
     console.error('❌ Failed to setup Transletta development watcher:', error);
   }
@@ -179,9 +162,7 @@ async function compileTranslationsInternal(userConfig?: TranslettaConfig) {
     }
     const transletta = new Transletta(config);
 
-    console.log('🔨 Compiling translations...');
     await transletta.compile().then(transletta.emit.bind(transletta));
-    console.log('✅ Translations compiled successfully');
   } catch (error) {
     console.error('❌ Failed to compile translations:', error);
     throw error; // Fail the build if translations fail

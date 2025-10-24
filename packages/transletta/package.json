@@ -1,6 +1,6 @@
 {
   "name": "transletta",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "Elegant i18n build system for humans",
   "main": "./dist/index.js",
@@ -35,6 +35,11 @@
       "types": "./dist/frameworks/vite.d.ts",
       "import": "./dist/frameworks/vite.js",
       "require": "./dist/frameworks/vite.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js",
+      "require": "./dist/client/index.js"
     }
   },
   "scripts": {
@@ -48,7 +53,7 @@
     "url": "https://github.com/twlite/transletta.git"
   },
   "author": "Twilight <hello@twlite.dev>",
-  "homepage": "https://transletta.twlite.dev",
+  "homepage": "https://github.com/twlite/transletta",
   "keywords": [
     "i18n",
     "translation",

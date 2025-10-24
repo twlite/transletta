@@ -121,7 +121,7 @@ export class TranslationManager implements CacheableManager<string, Collection<s
    * @returns The compiled translations.
    */
   public compile(options: CompileOptions = {}): CompilationResult {
-    const { force = false, diagnostics = false } = options;
+    const { force = false } = options;
 
     if (!force && this.compilationResult.size > 0) {
       return {
