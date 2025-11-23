@@ -13,7 +13,6 @@ export function createDtsGenerator(config: TranslettaConfig): DtsGenerator | nul
     const plugins = config.plugins?.find((p) => p.dts?.generators?.includes(config.dts as string));
 
     if (plugins?.dts) {
-      console.log(`Generating TypeScript definitions using ${plugins.name} plugin`);
       return plugins.dts;
     }
   }

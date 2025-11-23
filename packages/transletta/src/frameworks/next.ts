@@ -1,6 +1,7 @@
-import type { TranslettaConfig } from '../config/common.js';
+import { type PartialTranslettaConfig, type TranslettaConfig } from '../config/common.js';
 import { Transletta } from '../transletta.js';
 import { loadConfig } from '../config/load-config.js';
+import { defineConfig } from '../config/config.js';
 
 // @ts-ignore
 type NextConfig = import('next').NextConfig;
@@ -10,7 +11,7 @@ export interface TranslettaNextConfig {
    * The Transletta configuration to use.
    * If not provided, will attempt to load from transletta.config.ts
    */
-  config?: TranslettaConfig;
+  config?: PartialTranslettaConfig;
 
   /**
    * Whether to run Transletta compilation during build.
@@ -103,21 +104,21 @@ export function createTransletta(options: TranslettaNextConfig = {}) {
 /**
  * Sets up file watching for translation files in development mode.
  */
-async function setupDevelopmentWatcher(userConfig?: TranslettaConfig) {
+async function setupDevelopmentWatcher(userConfig?: PartialTranslettaConfig) {
+  let config: TranslettaConfig | null = null;
   try {
-    const config = userConfig || (await loadConfig(process.cwd()).catch(() => null));
+    config = (userConfig ? defineConfig(userConfig) : null) || (await loadConfig(process.cwd()).catch(() => null));
     if (!config) {
-      console.warn('⚠️ No Transletta configuration found. Skipping development watcher setup.');
+      console.warn('[Transletta] ⚠️ No Transletta configuration found. Skipping development watcher setup.');
       return;
     }
 
     const transletta = new Transletta(config);
     await transletta.compile().then(transletta.emit.bind(transletta));
+    console.log('[Transletta] ✅ Successfully compiled translations');
 
     const { watch } = await import('node:fs');
     const translationDir = transletta.getInputDirectory();
-
-    console.log(`👀 [Transletta] (${process.pid}) Watching translation files in: ${translationDir}`);
 
     let compileTimeout: NodeJS.Timeout | null = null;
     const pendingFiles = new Set<string>();
@@ -138,33 +139,35 @@ async function setupDevelopmentWatcher(userConfig?: TranslettaConfig) {
 
             try {
               await transletta.compile().then(transletta.emit.bind(transletta));
+              console.log('[Transletta] ✅ Successfully recompiled translations');
             } catch (error) {
-              console.error('❌ Failed to recompile translations:', error);
+              console.error('[Transletta] ❌ Failed to recompile translations:', error);
             }
           }
         }, 300);
       }
     });
   } catch (error) {
-    console.error('❌ Failed to setup Transletta development watcher:', error);
+    console.error('[Transletta] ❌ Failed to setup Transletta development watcher:', error);
   }
 }
 
 /**
  * Compiles translations during build process.
  */
-async function compileTranslationsInternal(userConfig?: TranslettaConfig) {
+async function compileTranslationsInternal(userConfig?: PartialTranslettaConfig) {
+  let config: TranslettaConfig | null = null;
+
   try {
-    const config = userConfig || (await loadConfig(process.cwd()).catch(() => null));
-    if (!config) {
-      console.warn('⚠️ No Transletta configuration found. Skipping compilation.');
-      return;
-    }
+    config = (userConfig ? defineConfig(userConfig) : null) || (await loadConfig(process.cwd()).catch(() => null));
+    if (!config) return;
+
     const transletta = new Transletta(config);
 
     await transletta.compile().then(transletta.emit.bind(transletta));
+    console.log('[Transletta] ✅ Successfully compiled translations');
   } catch (error) {
-    console.error('❌ Failed to compile translations:', error);
+    console.error('[Transletta] ❌ Failed to compile translations:', error);
     throw error; // Fail the build if translations fail
   }
 }
@@ -193,7 +196,8 @@ async function compileTranslationsInternal(userConfig?: TranslettaConfig) {
  */
 export async function compileTranslations(config?: TranslettaConfig): Promise<void> {
   try {
-    const translettaConfig = config || (await loadConfig(process.cwd()).catch(() => null));
+    const translettaConfig =
+      (config ? defineConfig(config) : null) || (await loadConfig(process.cwd()).catch(() => null));
     if (!translettaConfig) {
       throw new Error(
         'No Transletta configuration found. Please provide a config or create a transletta.config.ts file.',
@@ -201,11 +205,10 @@ export async function compileTranslations(config?: TranslettaConfig): Promise<vo
     }
     const transletta = new Transletta(translettaConfig);
 
-    console.log('🔨 Compiling translations...');
     await transletta.compile().then(transletta.emit.bind(transletta));
-    console.log('✅ Translations compiled successfully');
+    console.log('[Transletta] ✅ Successfully compiled translations');
   } catch (error) {
-    console.error('❌ Failed to compile translations:', error);
+    console.error('[Transletta] ❌ Failed to compile translations:', error);
     throw error;
   }
 }

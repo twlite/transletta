@@ -1,6 +1,6 @@
 {
   "name": "transletta",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "Elegant i18n build system for humans",
   "main": "./dist/index.js",
@@ -59,7 +59,8 @@
     "translation",
     "localization",
     "globalization",
-    "internationalization"
+    "internationalization",
+    "build-system"
   ],
   "devDependencies": {
     "@types/node": "catalog:build",
@@ -67,7 +68,7 @@
     "typescript": "catalog:build"
   },
   "dependencies": {
-    "commander": "^14.0.1",
-    "smol-toml": "^1.4.2"
+    "commander": "^14.0.2",
+    "smol-toml": "^1.5.2"
   }
 }

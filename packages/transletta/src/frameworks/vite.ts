@@ -1,6 +1,7 @@
 import type { TranslettaConfig } from '../config/common.js';
 import { Transletta } from '../transletta.js';
 import { loadConfig } from '../config/load-config.js';
+import { defineConfig } from '../config/config.js';
 
 type VitePlugin = {
   name: string;
@@ -45,26 +46,6 @@ export interface TranslettaViteConfig {
 
 /**
  * Creates a Vite plugin that integrates Transletta with the build process.
- *
- * @param options Configuration options for the Transletta Vite integration
- * @returns A Vite plugin object
- *
- * @example
- * ```ts
- * import { transletta } from 'transletta/vite'
- * import { defineConfig } from 'vite'
- *
- * export default defineConfig({
- *   plugins: [
- *     transletta({
- *       compileOnBuild: true,
- *       watchInDevelopment: true,
- *       enableHMR: true,
- *       hmrStrategy: 'targeted', // or 'full' for full page reloads
- *     })
- *   ]
- * })
- * ```
  */
 export function transletta(options: TranslettaViteConfig = {}): VitePlugin {
   const {
@@ -78,6 +59,14 @@ export function transletta(options: TranslettaViteConfig = {}): VitePlugin {
   let translettaInstance: Transletta | null = null;
   let isCompiling = false;
 
+  const initTransletta = async () => {
+    if (translettaInstance) return translettaInstance;
+    const config = userConfig || (await loadConfig(process.cwd()).catch(() => null));
+    if (!config) return null;
+    translettaInstance = new Transletta(config);
+    return translettaInstance;
+  };
+
   return {
     name: 'transletta',
 
@@ -87,16 +76,21 @@ export function transletta(options: TranslettaViteConfig = {}): VitePlugin {
       }
     },
 
-    async buildEnd() {
-      if (compileOnBuild && translettaInstance) {
-        console.log('✅ Transletta build completed');
-      }
-    },
-
     configureServer(server) {
-      if (watchInDevelopment) {
-        setupDevelopmentWatcher(userConfig, server, hmrStrategy);
-      }
+      if (!watchInDevelopment) return;
+
+      // Initialize and setup watcher
+      initTransletta().then(async (instance) => {
+        if (!instance) return;
+
+        // Initial compilation
+        await instance.compile().then(instance.emit.bind(instance));
+        console.log('[Transletta] ✅ Successfully compiled translations');
+
+        // Add input directory to Vite's watcher
+        const inputDir = instance.getInputDirectory();
+        server.watcher.add(inputDir);
+      });
     },
 
     async handleHotUpdate(ctx) {
@@ -106,39 +100,21 @@ export function transletta(options: TranslettaViteConfig = {}): VitePlugin {
 
       // Check if the changed file is a translation file
       if (file.endsWith('.toml')) {
-        console.log(`🔄 Translation file changed: ${file}`);
-
-        if (isCompiling) return; // Prevent concurrent compilations
-
+        if (isCompiling) return;
         isCompiling = true;
+
         try {
-          // Initialize transletta instance if not already done
-          if (!translettaInstance) {
-            const config = userConfig || (await loadConfig(process.cwd()).catch(() => null));
-            if (!config) {
-              console.warn('⚠️ No Transletta configuration found. Skipping HMR.');
-              return;
-            }
-            translettaInstance = new Transletta(config);
-          }
+          const instance = await initTransletta();
+          if (!instance) return;
 
-          await translettaInstance.compile().then(translettaInstance.emit.bind(translettaInstance));
-          console.log('✅ Translations recompiled successfully');
+          await instance.compile().then(instance.emit.bind(instance));
 
-          // Choose HMR strategy
           if (hmrStrategy === 'full') {
-            console.log('🔄 Performing full reload (strategy: full)');
-            server.ws.send({
-              type: 'full-reload',
-            });
+            server.ws.send({ type: 'full-reload' });
           } else {
-            // Find modules that depend on translation files and invalidate them
             const modulesToUpdate = await findTranslationDependentModules(server, file);
 
             if (modulesToUpdate.length > 0) {
-              console.log(`🔄 Updating ${modulesToUpdate.length} dependent module(s) (strategy: targeted)`);
-
-              // Send targeted HMR updates for each dependent module
               for (const moduleId of modulesToUpdate) {
                 server.ws.send({
                   type: 'update',
@@ -153,15 +129,11 @@ export function transletta(options: TranslettaViteConfig = {}): VitePlugin {
                 });
               }
             } else {
-              // Fallback to full reload if no specific modules found
-              console.log('⚠️ No dependent modules found, performing full reload');
-              server.ws.send({
-                type: 'full-reload',
-              });
+              server.ws.send({ type: 'full-reload' });
             }
           }
         } catch (error) {
-          console.error('❌ Failed to recompile translations:', error);
+          console.error('[Transletta] ❌ Failed to recompile translations:', error);
         } finally {
           isCompiling = false;
         }
@@ -178,14 +150,12 @@ async function findTranslationDependentModules(server: any, changedFile: string)
     const moduleGraph = server.moduleGraph;
     const dependentModules = new Set<string>();
 
-    // Get the output directory to find generated JSON files
     const config = await loadConfig(process.cwd()).catch(() => null);
     if (!config) return [];
 
     const transletta = new Transletta(config);
     const outputDir = transletta.getOutputDirectory();
 
-    // Find all generated JSON files that might be affected
     const { readdir } = await import('node:fs/promises');
     const { join } = await import('node:path');
 
@@ -195,33 +165,23 @@ async function findTranslationDependentModules(server: any, changedFile: string)
 
       for (const jsonFile of jsonFiles) {
         const jsonPath = join(outputDir, jsonFile);
-
-        // Find modules that import this JSON file
         const module = moduleGraph.getModuleById(jsonPath);
-        if (module) {
-          // Add the module itself
-          dependentModules.add((module as any).id);
 
-          // Add all modules that import this module
+        if (module) {
+          dependentModules.add((module as any).id);
           for (const importer of (module as any).importers) {
             dependentModules.add((importer as any).id);
           }
         }
       }
-    } catch (error) {
-      // Output directory might not exist yet
-      console.warn('⚠️ Could not read output directory:', error);
+    } catch {
+      // Ignore errors reading output directory
     }
 
-    // Also look for modules that might import translation files directly
-    // This covers cases where apps import .toml files or use custom loaders
     const allModules = Array.from(moduleGraph.idToModuleMap.values());
-
     for (const module of allModules) {
       if ((module as any).file && (module as any).file.includes('.transletta')) {
         dependentModules.add((module as any).id);
-
-        // Add all modules that import this module
         for (const importer of (module as any).importers) {
           dependentModules.add((importer as any).id);
         }
@@ -229,88 +189,8 @@ async function findTranslationDependentModules(server: any, changedFile: string)
     }
 
     return Array.from(dependentModules);
-  } catch (error) {
-    console.warn('⚠️ Error finding dependent modules:', error);
+  } catch {
     return [];
-  }
-}
-
-/**
- * Sets up file watching for translation files in development mode.
- */
-async function setupDevelopmentWatcher(
-  userConfig?: TranslettaConfig,
-  server?: any,
-  hmrStrategy: 'targeted' | 'full' = 'targeted',
-) {
-  try {
-    const config = userConfig || (await loadConfig(process.cwd()).catch(() => null));
-    if (!config) {
-      console.warn('⚠️ No Transletta configuration found. Skipping development watcher setup.');
-      return;
-    }
-
-    const transletta = new Transletta(config);
-
-    // Initial compilation
-    await transletta.compile().then(transletta.emit.bind(transletta));
-
-    // Set up file watching for development
-    const { watch } = await import('node:fs');
-    const translationDir = transletta.getInputDirectory();
-
-    watch(translationDir, { recursive: true }, async (eventType, filename) => {
-      if (filename && filename.endsWith('.toml')) {
-        console.log(`🔄 Translation file changed: ${filename}`);
-        try {
-          await transletta.compile().then(transletta.emit.bind(transletta));
-          console.log('✅ Translations recompiled successfully');
-
-          // Notify Vite dev server about the change
-          if (server) {
-            if (hmrStrategy === 'full') {
-              console.log('🔄 Performing full reload (strategy: full)');
-              server.ws.send({
-                type: 'full-reload',
-              });
-            } else {
-              const modulesToUpdate = await findTranslationDependentModules(server, filename);
-
-              if (modulesToUpdate.length > 0) {
-                console.log(`🔄 Updating ${modulesToUpdate.length} dependent module(s) (strategy: targeted)`);
-
-                // Send targeted HMR updates for each dependent module
-                for (const moduleId of modulesToUpdate) {
-                  server.ws.send({
-                    type: 'update',
-                    updates: [
-                      {
-                        type: 'js-update',
-                        path: moduleId,
-                        acceptedPath: moduleId,
-                        timestamp: Date.now(),
-                      },
-                    ],
-                  });
-                }
-              } else {
-                // Fallback to full reload if no specific modules found
-                console.log('⚠️ No dependent modules found, performing full reload');
-                server.ws.send({
-                  type: 'full-reload',
-                });
-              }
-            }
-          }
-        } catch (error) {
-          console.error('❌ Failed to recompile translations:', error);
-        }
-      }
-    });
-
-    console.log('👀 Watching translation files for changes...');
-  } catch (error) {
-    console.warn('⚠️ Failed to setup Transletta development watcher:', error);
   }
 }
 
@@ -319,59 +199,36 @@ async function setupDevelopmentWatcher(
  */
 async function compileTranslationsInternal(userConfig?: TranslettaConfig) {
   try {
-    const config = userConfig || (await loadConfig(process.cwd()).catch(() => null));
-    if (!config) {
-      console.warn('⚠️ No Transletta configuration found. Skipping compilation.');
-      return;
-    }
-    const transletta = new Transletta(config);
+    const config =
+      (userConfig ? defineConfig(userConfig) : null) || (await loadConfig(process.cwd()).catch(() => null));
+    if (!config) return;
 
-    console.log('🔨 Compiling translations...');
+    const transletta = new Transletta(config);
     await transletta.compile().then(transletta.emit.bind(transletta));
-    console.log('✅ Translations compiled successfully');
+    console.log('[Transletta] ✅ Successfully compiled translations');
   } catch (error) {
-    console.error('❌ Failed to compile translations:', error);
-    throw error; // Fail the build if translations fail
+    console.error('[Transletta] ❌ Failed to compile translations:', error);
+    throw error;
   }
 }
 
 /**
  * Utility function to manually compile translations.
- * Useful for custom build scripts or CI/CD pipelines.
- *
- * @param config Optional Transletta configuration
- * @returns Promise that resolves when compilation is complete
- *
- * @example
- * ```ts
- * import { compileTranslations } from 'transletta/vite'
- *
- * // Compile with default config
- * await compileTranslations()
- *
- * // Compile with custom config
- * await compileTranslations({
- *   input: './locales',
- *   output: './public/locales',
- *   primaryLocale: 'en'
- * })
- * ```
  */
 export async function compileTranslations(config?: TranslettaConfig): Promise<void> {
   try {
-    const translettaConfig = config || (await loadConfig(process.cwd()).catch(() => null));
+    const translettaConfig =
+      (config ? defineConfig(config) : null) || (await loadConfig(process.cwd()).catch(() => null));
     if (!translettaConfig) {
       throw new Error(
         'No Transletta configuration found. Please provide a config or create a transletta.config.ts file.',
       );
     }
     const transletta = new Transletta(translettaConfig);
-
-    console.log('🔨 Compiling translations...');
     await transletta.compile().then(transletta.emit.bind(transletta));
-    console.log('✅ Translations compiled successfully');
+    console.log('[Transletta] ✅ Successfully compiled translations');
   } catch (error) {
-    console.error('❌ Failed to compile translations:', error);
+    console.error('[Transletta] ❌ Failed to compile translations:', error);
     throw error;
   }
 }

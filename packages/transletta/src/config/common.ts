@@ -53,6 +53,11 @@ export interface TranslettaConfig {
   compactOutput: boolean;
 }
 
+/**
+ * Partial Transletta configuration.
+ */
+export type PartialTranslettaConfig = Partial<TranslettaConfig>;
+
 export const DEFAULT_CONFIG: TranslettaConfig = {
   plugins: [],
   input: '.transletta',

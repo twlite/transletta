@@ -54,12 +54,19 @@ export class ClientGenerator {
   private getClientDtsContent(resource: CompiledTranslations, transletta: Transletta) {
     let dts = `// Auto-generated Transletta client DTS module\n`;
 
-    dts += `export const Locales = ${resource
+    dts += `export type Locales = ${resource
       .toKeyArray()
       .map((locale) => `'${locale}'`)
       .join(' | ')};\n\n`;
 
-    dts += `export const DefaultLocale = '${transletta.config.primaryLocale}';\n\n`;
+    dts += `export const AvailableLocales = [${resource
+      .toKeyArray()
+      .map((locale) => `'${locale}'`)
+      .join(', ')}] as const;\n\n`;
+
+    dts += `export const DefaultLocale = '${transletta.config.primaryLocale}' as const;\n\n`;
+
+    dts += `export const isValidLocale = (locale: string): locale is Locales => AvailableLocales.includes(locale as Locales);\n\n`;
 
     return dts;
   }
@@ -72,12 +79,14 @@ export class ClientGenerator {
   private getClientContent(resource: CompiledTranslations, transletta: Transletta) {
     let client = `// Auto-generated Transletta client module\n`;
 
-    client += `export const Locales = ${resource
+    client += `export const AvailableLocales = [${resource
       .toKeyArray()
       .map((locale) => `'${locale}'`)
-      .join(' | ')};\n\n`;
+      .join(', ')}];\n\n`;
 
     client += `export const DefaultLocale = '${transletta.config.primaryLocale}';\n\n`;
+
+    client += `export const isValidLocale = (locale: string): locale is Locales => AvailableLocales.includes(locale as Locales);\n\n`;
 
     return client;
   }

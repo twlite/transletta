@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, type TranslettaConfig } from './common.js';
+import { DEFAULT_CONFIG, type PartialTranslettaConfig, type TranslettaConfig } from './common.js';
 
 export type { TranslettaConfig };
 
@@ -7,6 +7,6 @@ export type { TranslettaConfig };
  * @param config The Transletta configuration.
  * @returns The Transletta configuration.
  */
-export function defineConfig(config: Partial<TranslettaConfig>): TranslettaConfig {
+export function defineConfig(config: PartialTranslettaConfig): TranslettaConfig {
   return Object.assign({}, DEFAULT_CONFIG, config);
 }
