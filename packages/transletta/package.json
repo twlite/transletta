@@ -1,6 +1,6 @@
 {
   "name": "transletta",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "description": "Elegant i18n build system for humans",
   "main": "./dist/index.js",

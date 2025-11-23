@@ -86,7 +86,7 @@ export class ClientGenerator {
 
     client += `export const DefaultLocale = '${transletta.config.primaryLocale}';\n\n`;
 
-    client += `export const isValidLocale = (locale: string): locale is Locales => AvailableLocales.includes(locale as Locales);\n\n`;
+    client += `export const isValidLocale = (locale) => AvailableLocales.includes(locale);\n\n`;
 
     return client;
   }
